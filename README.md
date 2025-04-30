@@ -4,9 +4,13 @@ A simple Text User Interface (TUI) for managing your Tailscale connection using 
 
 Control Tailscale status, enable/disable, set exit nodes, and check your public IP address from a convenient terminal interface.
 
-  o o o
-  * * *   TailScaleTUI
-  o * o
+ o o o
+ * * *   TailScaleTUI
+ o * o
+
+## ss 
+
+![TailScaleTUI](ss-proj/tailTUI.png)
 
 
 ## Features
