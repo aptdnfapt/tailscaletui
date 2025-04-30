@@ -1,0 +1,285 @@
+#!/bin/bash
+
+# Check if gum is installed
+if ! command -v gum &>/dev/null; then
+  echo "gum could not be found. Please install it first:"
+  echo "https://github.com/charmbracelet/gum"
+  exit 1
+fi
+
+# Check if tailscale is installed
+if ! command -v tailscale &>/dev/null; then
+  echo "tailscale could not be found. Please install it first:"
+  echo "https://tailscale.com/download"
+  exit 1
+fi
+
+# Color variables
+GREEN=$(printf '\033[32m')
+RED=$(printf '\033[31m')
+YELLOW=$(printf '\033[33m')
+BLUE=$(printf '\033[34m')
+CYAN=$(printf '\033[36m')
+RESET=$(printf '\033[0m')
+
+# Main menu function
+main_menu() {
+  clear
+  gum style --border double --margin "1" --padding "1 2" --border-foreground 212 "Tailscale Manager"
+
+  local choice=$(gum choose --header="Select an option:" --height=8 \
+    "Status" \
+    "Enable Tailscale" \
+    "Disable Tailscale" \
+    "Restart Tailscale" \
+    "Set Exit Node" \
+    "Clear Exit Node" \
+    "Exit")
+
+  case $choice in
+  "Status")
+    show_status
+    ;;
+  "Enable Tailscale")
+    enable_tailscale
+    ;;
+  "Disable Tailscale")
+    disable_tailscale
+    ;;
+  "Restart Tailscale")
+    restart_tailscale
+    ;;
+  "Set Exit Node")
+    set_exit_node
+    ;;
+  "Clear Exit Node")
+    clear_exit_node
+    ;;
+  "Exit")
+    exit 0
+    ;;
+  esac
+}
+
+# Show enhanced Tailscale status with colors and numbering
+show_status() {
+  clear
+  gum style --border double --margin "1" --padding "1 2" --border-foreground 57 "Tailscale Status"
+  echo ""
+
+  # Get current exit node (active one without "offers")
+  local current_exit_node=$(tailscale status | grep 'exit node; direct' | grep -v 'offers exit node')
+
+  # Display current exit node info if exists
+  if [ -n "$current_exit_node" ]; then
+    local public_ip=$(echo "$current_exit_node" | grep -oE 'direct [^:]+' | awk '{print $2}')
+    gum style --foreground 33 "Current Exit Node:"
+    echo -e "${CYAN}$current_exit_node${RESET}"
+    echo -e "${BLUE}Public IP: ${public_ip}${RESET}"
+    echo ""
+  fi
+
+  # Process status with colors and numbering
+  local counter=1
+  local online_count=0
+  local offline_count=0
+
+  # Get terminal width for wrapping
+  local term_width=$(tput cols)
+  local status_width=$((term_width - 10)) # Leave space for line numbers
+
+  # Store status in variable for counting
+  local status_output=$(tailscale status)
+
+  # First count online/offline devices
+  while IFS= read -r line; do
+    if [[ "$line" == *"offline"* ]]; then
+      ((offline_count++))
+    elif [[ "$line" != *"offline"* ]]; then
+      ((online_count++))
+    fi
+  done <<<"$status_output"
+
+  # Then display with numbering
+  while IFS= read -r line; do
+    if [[ "$line" == *"offline"* ]]; then
+      printf "${RED}%3d. ${line}${RESET}\n" "$counter"
+    elif [[ "$line" == *"exit node; direct"* && ! "$line" == *"offers exit node"* ]]; then
+      printf "${CYAN}%3d. ${line}${RESET}\n" "$counter"
+    elif [[ "$line" == *"offers exit node"* ]]; then
+      printf "${YELLOW}%3d. ${line}${RESET}\n" "$counter"
+    elif [[ "$line" == *"active"* || "$line" == *"idle"* ]]; then
+      printf "${GREEN}%3d. ${line}${RESET}\n" "$counter"
+    else
+      printf "${GREEN}%3d. ${line}${RESET}\n" "$counter"
+    fi
+    ((counter++))
+  done <<<"$status_output" | fold -w $status_width -s
+
+  echo ""
+  echo -e "${GREEN}Online devices: $online_count${RESET}, ${RED}Offline devices: $offline_count${RESET}"
+  echo ""
+
+  # Search functionality
+  gum style --foreground 240 "Press '/' to search or any other key to return to main menu..."
+  read -n 1 -s key
+
+  if [ "$key" = "/" ]; then
+    clear
+    gum style --border double --margin "1" --padding "1 2" --border-foreground 57 "Search Tailscale Status"
+    echo ""
+    local search_term=$(gum input --placeholder "Enter search term...")
+    if [ -n "$search_term" ]; then
+      clear
+      gum style --border double --margin "1" --padding "1 2" --border-foreground 57 "Search Results for: $search_term"
+      echo ""
+      tailscale status | grep -i "$search_term" | while IFS= read -r line; do
+        if [[ "$line" == *"offline"* ]]; then
+          echo -e "${RED}${line}${RESET}"
+        elif [[ "$line" == *"exit node; direct"* && ! "$line" == *"offers exit node"* ]]; then
+          echo -e "${CYAN}${line}${RESET}"
+        elif [[ "$line" == *"offers exit node"* ]]; then
+          echo -e "${YELLOW}${line}${RESET}"
+        elif [[ "$line" == *"active"* || "$line" == *"idle"* ]]; then
+          echo -e "${GREEN}${line}${RESET}"
+        else
+          echo -e "${GREEN}${line}${RESET}"
+        fi
+      done
+      echo ""
+      gum style --foreground 240 "Press any key to return to main menu..."
+      read -n 1 -s
+    fi
+  fi
+
+  main_menu
+}
+
+# Enable Tailscale
+enable_tailscale() {
+  clear
+  gum style --border double --margin "1" --padding "1 2" --border-foreground 69 "Enabling Tailscale"
+  echo ""
+  tailscale up
+  if [ $? -eq 0 ]; then
+    gum style --foreground 10 "Tailscale enabled successfully!"
+  else
+    gum style --foreground 9 "Failed to enable Tailscale!"
+  fi
+  sleep 1
+  main_menu
+}
+
+# Disable Tailscale
+disable_tailscale() {
+  clear
+  gum style --border double --margin "1" --padding "1 2" --border-foreground 69 "Disabling Tailscale"
+  echo ""
+  tailscale down
+  if [ $? -eq 0 ]; then
+    gum style --foreground 10 "Tailscale disabled successfully!"
+  else
+    gum style --foreground 9 "Failed to disable Tailscale!"
+  fi
+  sleep 1
+  main_menu
+}
+
+# Restart Tailscale
+restart_tailscale() {
+  clear
+  gum style --border double --margin "1" --padding "1 2" --border-foreground 69 "Restarting Tailscale"
+  echo ""
+  tailscale down && tailscale up
+  if [ $? -eq 0 ]; then
+    gum style --foreground 10 "Tailscale restarted successfully!"
+  else
+    gum style --foreground 9 "Failed to restart Tailscale!"
+  fi
+  sleep 1
+  main_menu
+}
+
+# Set exit node with search functionality
+set_exit_node() {
+  clear
+  gum style --border double --margin "1" --padding "1 2" --border-foreground 93 "Available Exit Nodes (Online only)"
+  echo ""
+
+  # Get list of online exit nodes (only those offering exit node)
+  local exit_nodes=$(tailscale status | grep 'offers exit node' | grep -v "offline" | awk '{print $1 "  " $2 " (" $3 ")"}')
+
+  if [ -z "$exit_nodes" ]; then
+    gum style --foreground 9 "No online exit nodes available in your network!"
+    sleep 1
+    main_menu
+    return
+  fi
+
+  # Add "Clear exit node" and "Back to menu" options
+  exit_nodes+=$'\n'"Clear exit node"
+  exit_nodes+=$'\n'"Back to menu"
+
+  local selected=$(echo "$exit_nodes" | gum filter --header="Search exit node:" --placeholder="Type to search...")
+
+  if [ "$selected" == "Back to menu" ]; then
+    main_menu
+    return
+  elif [ "$selected" == "Clear exit node" ]; then
+    tailscale set --exit-node=
+    gum style --foreground 10 "Exit node cleared successfully!"
+    sleep 1
+    main_menu
+    return
+  fi
+
+  # Extract IP from selection
+  local exit_node_ip=$(echo "$selected" | awk '{print $1}')
+  local exit_node_name=$(echo "$selected" | awk '{print $2}')
+
+  gum style --border double --margin "1" --padding "1 2" --border-foreground 69 "Setting Exit Node"
+  echo ""
+  tailscale set --exit-node="$exit_node_ip"
+
+  if [ $? -eq 0 ]; then
+    gum style --foreground 10 "Exit node set to $exit_node_name ($exit_node_ip) successfully!"
+    echo ""
+    # Show the new exit node with public IP
+    local new_exit=$(tailscale status | grep "$exit_node_ip.*exit node; direct")
+    if [ -n "$new_exit" ]; then
+      local public_ip=$(echo "$new_exit" | grep -oE 'direct [^:]+' | awk '{print $2}')
+      gum style --foreground 33 "Current Exit Node:"
+      echo -e "${CYAN}$new_exit${RESET}"
+      echo -e "${BLUE}Public IP: ${public_ip}${RESET}"
+      echo ""
+      gum style --foreground 33 "IP Information from ipinfo.io:"
+      curl -s ipinfo.io | while IFS= read -r line; do
+        echo -e "${CYAN}$line${RESET}"
+      done
+    fi
+  else
+    gum style --foreground 9 "Failed to set exit node!"
+  fi
+  echo ""
+  gum style --foreground 240 "Press any key to return to main menu..."
+  read -n 1 -s
+  main_menu
+}
+
+# Clear exit node
+clear_exit_node() {
+  clear
+  gum style --border double --margin "1" --padding "1 2" --border-foreground 69 "Clearing Exit Node"
+  echo ""
+  tailscale set --exit-node=
+  if [ $? -eq 0 ]; then
+    gum style --foreground 10 "Exit node cleared successfully!"
+  else
+    gum style --foreground 9 "Failed to clear exit node!"
+  fi
+  sleep 1
+  main_menu
+}
+
+# Run main menu
+main_menu
