@@ -3,10 +3,11 @@
 A simple Text User Interface (TUI) for managing your Tailscale connection using Bash and Gum.
 
 Control Tailscale status, enable/disable, set exit nodes, and check your public IP address from a convenient terminal interface.
-
+```markdown
  o o o
  * * *   TailScaleTUI
  o * o
+```
 
 ## ss 
 
