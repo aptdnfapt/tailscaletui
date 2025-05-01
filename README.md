@@ -78,6 +78,7 @@ This script relies on the following command-line tools:
 Navigate to the directory where you cloned the script and run:
 
 ```bash
+sudo tailscale set --operator=$USER
 mv ./tailscale.tui ~/.local/bin/
 tailscale.tui
 
