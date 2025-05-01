@@ -499,7 +499,7 @@ main_menu() {
   " Status") show_status ;;
   " Enable Tailscale") enable_tailscale ;;
   " Disable Tailscale") disable_tailscale ;;
-  " Restart Tailscale") restart_tailscale ;;
+  " RRestart Tailscale") restart_tailscale ;;
   "󰤪 Set Exit Node") set_exit_node ;;
   "󰤭 Clear Exit Node") clear_exit_node ;;
   "󰩟 Check Public IP") check_public_ip ;;
