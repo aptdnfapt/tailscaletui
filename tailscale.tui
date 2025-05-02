@@ -339,14 +339,22 @@ disable_tailscale() {
 restart_tailscale() {
   clear_viewport
   display_ascii_header "Restart Tailscale" "$COLOR_O_ACTION" "$COLOR_STAR_ACTION" "$COLOR_TEXT_ACTION"
-  # Use bash -c to handle the '&&' correctly within the spinner
-  run_with_spinner "  Running tailscale down && tailscale up..." \
-    "Tailscale restarted successfully!" \
-    "Failed to restart Tailscale." \
-    bash -c "tailscale down && tailscale up"
+  
+  # First get sudo credentials without spinner
+  echo "  ${ANSI_CYAN}Please enter sudo password if prompted:${ANSI_RESET}"
+  if sudo -v; then
+    # Now run the restart command with spinner, sudo won't prompt again
+    run_with_spinner "  Restarting Tailscale service..." \
+      "Tailscale restarted successfully!" \
+      "Failed to restart Tailscale." \
+      sudo systemctl restart tailscaled.service
+  else
+    display_message "$GUM_COLOR_FG_ERROR" "Failed to get sudo access."
+  fi
   sleep 1
   main_menu
 }
+
 
 # Allows the user to select and set a Tailscale exit node from available online nodes.
 set_exit_node() {
@@ -488,7 +496,7 @@ main_menu() {
     " Status" \
     " Enable Tailscale" \
     " Disable Tailscale" \
-    " RRestart Tailscale" \
+    " RRestart Tailscale (systemctl)" \
     "󰤪 Set Exit Node" \
     "󰤭 Clear Exit Node" \
     "󰩟 Check Public IP" \
@@ -499,7 +507,7 @@ main_menu() {
   " Status") show_status ;;
   " Enable Tailscale") enable_tailscale ;;
   " Disable Tailscale") disable_tailscale ;;
-  " RRestart Tailscale") restart_tailscale ;;
+  " RRestart Tailscale (systemctl)") restart_tailscale ;;
   "󰤪 Set Exit Node") set_exit_node ;;
   "󰤭 Clear Exit Node") clear_exit_node ;;
   "󰩟 Check Public IP") check_public_ip ;;
