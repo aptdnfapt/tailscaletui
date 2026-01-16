@@ -387,6 +387,10 @@ set_exit_node() {
     return
   fi
 
+  # Ask user if they want LAN access
+  local allow_lan
+  allow_lan=$(gum confirm "Allow LAN access through exit node?" --affirmative="Yes, allow LAN" --negative="No, don't allow LAN" && echo "--exit-node-allow-lan-access" || echo "")
+
   # Prepare choices for Gum filter, adding special options
   local choices=$(
     echo "$exit_nodes_raw"
@@ -418,10 +422,10 @@ set_exit_node() {
   clear_viewport
   display_ascii_header "Setting Exit Node" "$COLOR_O_ACTION" "$COLOR_STAR_ACTION" "$COLOR_TEXT_ACTION"
   # Run the 'tailscale set' command with spinner
-  if run_with_spinner "  Setting exit node to $exit_node_name ($exit_node_ip)..." \
+  if run_with_spinner "  Setting exit node to $exit_node_name ($exit_node_ip) ${allow_lan:+with LAN access}..." \
     "Exit node set successfully!" \
     "Failed to set exit node." \
-    tailscale set --exit-node="$exit_node_ip"; then
+    tailscale set --exit-node="$exit_node_ip" $allow_lan; then
 
     # After successfully setting, verify and show IP info (without clearing)
     echo ""
